@@ -53,8 +53,14 @@ jobs:
         run: |
           docker-compose run --rm api-users /bin/sh -c './wait-for-it.sh user-db:5432 -- echo "user-db is up"'
 
-      - name: Run tests for api-users
-        run: docker-compose run --rm api-users npm test
+      # On installe les dépendances et on lance les tests pour api-users
+      - name: Install dependencies and run tests for api-users
+        run: |
+          docker-compose run --rm api-users /bin/sh -c '
+              npm ci
+              npm run build
+              npm run test
+            '
 
       - name: Tear down services
         run: docker-compose down
