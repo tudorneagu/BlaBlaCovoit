@@ -58,7 +58,7 @@ jobs:
         run: |
           docker-compose run --rm api-users /bin/sh -c '
               npm ci
-              npm run test
+              npm run test -- --detectOpenHandles --forceExit
             '
 
       - name: Tear down services
