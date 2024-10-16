@@ -4,32 +4,28 @@ on:
   push:
     branches:
       - main
+      - ci/cd
   pull_request:
     branches:
       - main
 
 jobs:
-  build:
+  # Etape 1 : test
+  test:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: "20"
-
+      - uses: actions/checkout@v3
+      # On définit le buildx pour pouvoir builder des images multiplateformes
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-
-      - name: Install Docker Compose
-        run: |
-          sudo curl -L "https://github.com/docker/compose/releases/download/v2.5.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-          sudo chmod +x /usr/local/bin/docker-compose
-          docker-compose --version
-
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+      # On créer le fichier .env
       - name: Create .env file
         run: |
           echo "PG_DATABASE=${{ secrets.PG_DATABASE }}" >> .env
@@ -37,22 +33,61 @@ jobs:
           echo "PG_PASSWORD=${{ secrets.PG_PASSWORD }}" >> .env
           echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
           echo "SCRYPT_SECRET=${{ secrets.SCRYPT_SECRET }}" >> .env
-
+      # On build les services avec docker compose
       - name: Build and start services
         run: |
-          docker-compose build
-          docker-compose up -d
-
-      - name: Wait for PostgreSQL to be ready
+          docker compose build
+          docker compose up -d
+        # on attend que le service soit prêt
+      - name: Wait for services to be ready
         run: |
-          until docker exec user-db pg_isready -U ${{ secrets.PG_USER }}; do
-            echo "Waiting for user-db database connection..."
-            sleep 2
-          done
-
-      - name: Run tests API-User
-        run: |
-          docker-compose exec api-users npm test
-
+          docker-compose run --rm api-users /bin/sh -c 'until nc -z user-db 5432; do echo waiting for user-db; sleep 2; done;'
+      # On lance les tests
+      - name: Run tests for api-users
+        run: docker-compose run --rm api-users npm test
+      # On détruit les services
       - name: Tear down services
-        run: docker-compose down
+        run: docker compose down
+
+  # Etape 2 : Build
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    # On définit une matrice de services à build
+    strategy:
+      matrix:
+        service:
+          [api-authentication, api-authorisation, api-business, api-users]
+    steps:
+      - uses: actions/checkout@v3
+      # On définit le buildx pour pouvoir builder des images multiplateformes
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      # On cache les layers de l'image
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+      # On build l'image
+      - name: Build Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./src/${{ matrix.service }}
+          push: false
+          tags: user/${{ matrix.service }}:latest
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new
+
+  # Etape 3 : Deploy
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    steps:
+      # C'est ici que l'on déploiera nos services dans l'environnement de production
+      - name: Deploy to production
+        run: |
+          echo "Deploying to production"
