@@ -18,6 +18,13 @@ jobs:
       # On définit le buildx pour pouvoir builder des images multiplateformes
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+      # On installe docker compose
+      - name: Install Docker Compose
+        run: |
+          sudo curl -L "https://github.com/docker/compose/releases/download/v2.5.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          docker-compose --version
+      # On cache les layers de l'image
       - name: Cache Docker layers
         uses: actions/cache@v3
         with:
