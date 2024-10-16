@@ -1,0 +1,70 @@
+@startuml
+
+skinparam defaultFontName Monospaced
+skinparam linetype ortho
+
+entity User {
+  id        : INTEGER       <<PK, NOT NULL>>
+  --
+  lastname  : VARCHAR(255)  <<NOT NULL>>
+  firstname : VARCHAR(255)
+  email     : VARCHAR(255)  <<NOT NULL, UNIQUE>>
+  password  : VARCHAR(255)  <<NOT NULL>>
+  image     : VARCHAR(255)
+}
+
+entity Role {
+  id   : INTEGER  <<PK, NOT NULL>>
+  --
+  name : VARCHAR(255)
+}
+
+entity UserRole {
+  id      : INTEGER  <<PK, NOT NULL>>
+  --
+  user_id : INTEGER  <<FK, NOT NULL>>
+  role_id : INTEGER  <<FK, NOT NULL>>
+}
+
+entity Travel {
+  id          : INTEGER           <<PK, NOT NULL>>
+  --
+  description    : TEXT
+  start_location : VARCHAR(255)   <<NOT NULL>>
+  end_location   : VARCHAR(255)   <<NOT NULL>>
+  date           : TIMESTAMPTZ    <<NOT NULL>>
+  price          : DECIMAL(10, 2) <<NOT NULL>>
+  capacity       : INTEGER        <<NOT NULL>>
+  detour_allowed : BOOLEAN        <<NOT NULL>>
+  user_id        : INTEGER        <<FK, NOT NULL>>
+}
+
+entity Booking {
+  id              : INTEGER       <<PK, NOT NULL>>
+  --
+  date            : TIMESTAMPTZ   <<NOT NULL>>
+  status          : VARCHAR(50)   <<NOT NULL>>
+  pickup_location : VARCHAR(255)  <<NOT NULL>>
+  comment         : TEXT
+  nb_passengers   : INTEGER       <<NOT NULL>>
+  user_id         : INTEGER       <<FK, NOT NULL>>
+  travel_id       : INTEGER       <<FK, NOT NULL>>
+}
+
+entity Review {
+  id          : INTEGER       <<PK, NOT NULL>>
+  --
+  date         : TIMESTAMPTZ  <<NOT NULL>>
+  rating       : INTEGER      <<NOT NULL>>
+  comment      : TEXT         
+  booking_id   : INTEGER      <<FK, NOT NULL>>
+}
+
+User ||--o{ UserRole : "has roles "
+Role ||--o{ UserRole : "has users "
+User ||--o{ Booking : "makes "
+Travel ||--o{ Booking : "has "
+Booking ||--o{ Review : "receives "
+User ||--o{ Travel : "creates "
+
+@enduml

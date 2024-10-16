@@ -1,0 +1,108 @@
+services:
+  api-users:
+    container_name: api-users
+    build:
+      context: ./src/api-users
+      dockerfile: Dockerfile
+
+    volumes:
+      - ./src/api-users:/app
+    ports:
+      - 3000:3000
+    environment:
+      PGDATABASE: ${PG_DATABASE}
+      PGUSER: ${PG_USER}
+      PGPASSWORD: ${PG_PASSWORD}
+      PGHOST: user-db
+      PGPORT: 5432
+    depends_on:
+      - user-db
+    command: ["bash", "-c", "./wait-for-it.sh user-db:5432 -- npm run dev"]
+    restart: unless-stopped
+
+  api-authentication:
+    container_name: api-authentication
+    build:
+      context: ./src/api-authentication
+      dockerfile: Dockerfile
+    volumes:
+      - ./src/api-authentication:/app
+    ports:
+      - 3010:3000
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      SCRYPT_SECRET: ${SCRYPT_SECRET}
+      API_USERS_URL: http://api-users:3000
+    depends_on:
+      - api-users
+    command: ["bash", "-c", "./wait-for-it.sh user-db:5432 -- npm run dev"]
+    restart: unless-stopped
+
+  api-authorisation:
+    container_name: api-authorisation
+    build:
+      context: ./src/api-authorisation
+      dockerfile: Dockerfile
+    volumes:
+      - ./src/api-authorisation:/app
+    ports:
+      - 3011:3000
+    command: ["bash", "-c", "npm run dev"]
+    restart: unless-stopped
+
+  api-business:
+    container_name: api-business
+    build:
+      context: ./src/api-business
+      dockerfile: Dockerfile
+    volumes:
+      - ./src/api-business:/app
+    ports:
+      - 3012:3000
+    depends_on:
+      - business-db
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/business-db
+
+    command: ["bash", "-c", "npm run dev"]
+    restart: unless-stopped
+
+  user-db:
+    image: postgres
+    container_name: user-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+      POSTGRES_DB: ${PG_DATABASE}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./src/init-user-db:/docker-entrypoint-initdb.d
+      - ./pg-data:/var/lib/postgresql/data
+
+  business-db:
+    image: mongo
+    container_name: business-db
+    ports:
+      - "27017:27017"
+    restart: always
+    environment:
+      # MONGO_INITDB_ROOT_USERNAME: admin  # Définit l'utilisateur root de la base MongoDB (commenté pour ne pas être utilisé)
+      # MONGO_INITDB_ROOT_PASSWORD: 123456  # Définit le mot de passe pour l'utilisateur root (commenté pour ne pas être utilisé)
+      MONGO_INITDB_DATABASE: business-db
+    volumes:
+      - ./src/mongod.conf:/etc/mongo/mongod.conf
+      - ./src/init-business/init-travel.js:/docker-entrypoint-initdb.d/init-travel.js:ro
+      - ./src/init-business/init-booking.js:/docker-entrypoint-initdb.d/init-posts.js:ro
+      - ./src/init-business/init-review.js:/docker-entrypoint-initdb.d/init-posts.js:ro
+    command: ["mongod", "--config", "/etc/mongo/mongod.conf"]
+
+  adminer:
+    image: adminer
+    container_name: adminer
+    restart: always
+    ports:
+      - 4000:8080
+    depends_on:
+      - user-db
