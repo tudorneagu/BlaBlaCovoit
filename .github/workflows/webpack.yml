@@ -48,7 +48,7 @@ jobs:
         # on attend que le service soit prêt
       - name: Wait for services to be ready
         run: |
-          docker-compose run --rm api-users /bin/sh -c 'until nc -z user-db 5432; do echo waiting for user-db; sleep 2; done;'
+          docker-compose run --rm api-users /bin/sh -c 'until nc -z ocovoit 5432; do echo waiting for ocovoit; sleep 2; done;'
       # On lance les tests
       - name: Run tests for api-users
         run: docker-compose run --rm api-users npm test
