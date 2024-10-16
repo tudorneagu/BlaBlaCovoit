@@ -15,7 +15,7 @@ app.use((req: Request, _: Response, next: NextFunction) => {
   log(`${req.method} ${req.url}`);
   next();
 });
-app.use("/api", router);
+app.use("/api/business", router);
 
 app.listen(3000, () => {
   log("🚀 api-business ready on port 3000");

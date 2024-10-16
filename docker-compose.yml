@@ -1,4 +1,19 @@
 services:
+  traefik:
+    image: traefik:v2.5
+    container_name: traefik
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+
   api-users:
     container_name: api-users
     build:
@@ -7,8 +22,8 @@ services:
 
     volumes:
       - ./src/api-users:/app
-    ports:
-      - 3000:3000
+    # ports:
+    #   - 3000:3000
     environment:
       PGDATABASE: ${PG_DATABASE}
       PGUSER: ${PG_USER}
@@ -19,6 +34,10 @@ services:
       - user-db
     command: ["bash", "-c", "./wait-for-it.sh user-db:5432 -- npm run dev"]
     restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api-users.rule=PathPrefix(`/api/users`)"
+      - "traefik.http.services.api-users.loadbalancer.server.port=3000"
 
   api-authentication:
     container_name: api-authentication
@@ -27,8 +46,8 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./src/api-authentication:/app
-    ports:
-      - 3010:3000
+    # ports:
+    #   - 3010:3000
     environment:
       JWT_SECRET: ${JWT_SECRET}
       SCRYPT_SECRET: ${SCRYPT_SECRET}
@@ -37,6 +56,10 @@ services:
       - api-users
     command: ["bash", "-c", "./wait-for-it.sh user-db:5432 -- npm run dev"]
     restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api-authentication.rule=PathPrefix(`/api/authentication`)"
+      - "traefik.http.services.api-authentication.loadbalancer.server.port=3000"
 
   api-authorisation:
     container_name: api-authorisation
@@ -45,10 +68,14 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./src/api-authorisation:/app
-    ports:
-      - 3011:3000
+    # ports:
+    #   - 3011:3000
     command: ["bash", "-c", "npm run dev"]
     restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api-authorisation.rule=PathPrefix(`/api/authorisation`)"
+      - "traefik.http.services.api-authorisation.loadbalancer.server.port=3000"
 
   api-business:
     container_name: api-business
@@ -57,15 +84,18 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./src/api-business:/app
-    ports:
-      - 3012:3000
+    # ports:
+    #   - 3012:3000
     depends_on:
       - business-db
     environment:
       - MONGODB_URI=mongodb://mongo:27017/business-db
-
     command: ["bash", "-c", "npm run dev"]
     restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api-business.rule=PathPrefix(`/api/business`)"
+      - "traefik.http.services.api-business.loadbalancer.server.port=3000"
 
   user-db:
     image: postgres

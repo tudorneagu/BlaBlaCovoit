@@ -18,7 +18,7 @@ function createServer(): Application {
     log(`${req.method} ${req.url}`);
     next();
   });
-  app.use("/api", router);
+  app.use("/api/authentication", router);
   app.use(notFoundMw);
   app.use(errorMw);
 
